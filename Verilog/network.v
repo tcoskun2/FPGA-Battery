@@ -21,7 +21,7 @@ module battery_soh_predictor (
     parameter LAYER3_SIZE = 16;
     parameter OUTPUT_SIZE = 1;
 
-    // Internal registers between layers
+    // Internal wires between layers
     wire [32*64-1:0] layer1_out;
     wire [32*64-1:0] layer1_fin;
     wire [32*32-1:0] layer2_out;
@@ -126,8 +126,6 @@ module linear_layer #(
     reg signed [31:0] bias_vec[0:OUT_SIZE-1];            // Unpacked bias vector
     reg signed [31:0] temp_out[0:OUT_SIZE-1];            // Temporary output storage
     reg signed [63:0] temp_internal;            // Temporary output storage
-    reg signed [63:0] matrixcheck;            // Temporary output storage
-    reg signed [63:0] infocheck;            // Temporary output storage
 
 
     integer i, j;
@@ -157,8 +155,6 @@ module linear_layer #(
             for (i = 0; i < OUT_SIZE; i = i + 1) begin
                 temp_out[i] = bias_vec[i]; // Start with bias
                 for (j = 0; j < IN_SIZE; j = j + 1) begin
-                    matrixcheck = weight_matrix[j][i];
-                    infocheck = in_vec[j];
                     temp_internal = in_vec[j] * weight_matrix[j][i];
                     temp_internal = temp_internal >>> 16;
                     temp_out[i] = temp_out[i] + temp_internal;
