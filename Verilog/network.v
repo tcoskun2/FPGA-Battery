@@ -121,45 +121,30 @@ module linear_layer #(
 );
 
     // Internal signals
-    reg signed [31:0] in_vec[0:IN_SIZE-1];               // Unpacked input vector
-    reg signed [31:0] weight_matrix[0:IN_SIZE-1][0:OUT_SIZE-1]; // Unpacked weight matrix
-    reg signed [31:0] bias_vec[0:OUT_SIZE-1];            // Unpacked bias vector
-    reg signed [31:0] temp_out[0:OUT_SIZE-1];            // Temporary output storage
-    reg signed [63:0] temp_internal;            // Temporary output storage
 
+    reg signed [31:0] temp_out;                         // Temporary output storage
+    reg signed [63:0] temp_internal;                    // Temporary output storage for multiplication, 64bit
 
     integer i, j;
 
-    // Unpack the input data, weights, and biases
-    always @(*) begin
-        for (i = 0; i < IN_SIZE; i = i + 1) begin
-            in_vec[i] = in_data[(IN_SIZE-i-1)*32 +: 32];
-        end
-
-        for (i = 0; i < OUT_SIZE; i = i + 1) begin
-            for (j = 0; j < IN_SIZE; j = j + 1) begin
-                weight_matrix[j][i] = weights[(IN_SIZE*OUT_SIZE-i*IN_SIZE - j -1)*32 +: 32];
-            end
-            bias_vec[i] = biases[(OUT_SIZE-i-1)*32 +: 32];
-        end
-    end
-
-    // Perform matrix-vector multiplication and add bias
+    // Perform matrix multiplication and add bias
     always @(posedge clk or posedge reset) begin
         if (reset) begin
-            for (i = 0; i < OUT_SIZE; i = i + 1) begin
-                temp_out[i] <= 32'b0;
-                out_data[i*32 +: 32] <= 32'b0;
-            end
+            out_data <= 0;
         end else begin
-            for (i = 0; i < OUT_SIZE; i = i + 1) begin
-                temp_out[i] = bias_vec[i]; // Start with bias
-                for (j = 0; j < IN_SIZE; j = j + 1) begin
-                    temp_internal = in_vec[j] * weight_matrix[j][i];
-                    temp_internal = temp_internal >>> 16;
-                    temp_out[i] = temp_out[i] + temp_internal;
+        
+            for (i = 0; i < OUT_SIZE; i = i + 1) begin      // for each output
+                temp_out = biases[(OUT_SIZE-i-1)*32 +: 32]; // Add the bias
+                
+                for (j = 0; j < IN_SIZE; j = j + 1) begin       // for each input per output
+                            //intermediate storage is 64 bit
+                    temp_internal = $signed(in_data[(IN_SIZE-j-1)*32 +: 32]) * //Initial data dot product with weight vec.
+                                    $signed(weights[(IN_SIZE*OUT_SIZE-i*IN_SIZE - j -1)*32 +: 32]);    
+                    temp_internal = temp_internal >>> 16;               //shift down
+                    temp_out = temp_out + $signed(temp_internal[31:0]);  //add sum of each product
                 end
-                out_data[(OUT_SIZE-i-1)*32 +: 32] <= temp_out[i];
+                
+                out_data[(OUT_SIZE-i-1)*32 +: 32] <= temp_out;   //add to output
             end
         end
     end
